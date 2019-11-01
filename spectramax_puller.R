@@ -18,6 +18,7 @@ library(xlsx)
 library(ggpubr)
 library(grid)
 library(lubridate)
+library(matrixStats)
 
 
 dftabs = read.delim('IVK_plague_46hr_final.pda.txt', header = FALSE)
@@ -58,15 +59,22 @@ for (i in 1:length(timesOut[,1])){
 }
 
 
-plateArray = plateArray[,,1:187]
-timesOut = timesOut[1:187,1]
+####APPEND DATA####
+endPoint = 187
+plateArray = plateArray[,,1:endPoint]
+timesOut = timesOut[1:endPoint,1]
 
 
 #subtract background
-plateArray = plateArray - 0.056
+#duplicate initial absorbance
+plateArraybk = array(as.matrix(plateArray[,,1]), dim=c(8,12,endPoint))
+plateArray = plateArray-plateArraybk
 
 #divide by maximum absorbance found to normalize
 plateArray = plateArray/max(plateArray)
+
+
+
 
 #make into groups
 #n=4, 3 groups
@@ -76,8 +84,16 @@ g1 = plateArray[,1:4,]
 g2 = plateArray[,5:8,]
 g3 = plateArray[,9:12,]
 
-gAve = array(NA, dim = c(3,8,length(timesOut)))
-gErr = array(NA, dim = c(3,8,length(timesOut)))
+
+######Convert NA into the average in g1 since well messed up!#####
+for (i in 1:length(plateArray[1,1,])){
+    g1[3,4,i] = sum(g1[3,1,i], g1[3,2,i], g1[3,3,i])/3
+}
+
+
+
+gAve = array(NA, dim = c(8,3,length(timesOut)))
+gErr = array(NA, dim = c(8,3,length(timesOut)))
 
 for (i in 1:length(timesOut)){
   gAve[,1,i] = rowMeans(g1[,,i])
@@ -91,37 +107,81 @@ for (i in 1:length(timesOut)){
 }
 
 
+g1x = matrix(NA, nrow=8, ncol=1)
+g2x = matrix(NA, nrow=8, ncol=1)
+g3x = matrix(NA, nrow=8, ncol=1)
+
+for (i in 1:7){
+  g1x[i] = round(4*750/(4*(i^2)), digits = 0)
+  g2x[i] = round(4*750/(4*(i^2)), digits = 0)
+  g3x[i] = round(4*0.56/(4*(i^2)), digits = 3)
+}
+
+g1x[8] = 0
+g2x[8] = 0
+g3x[8] = 0
+
+g1x = sapply(g1x, paste, " nCi/100uL")
+g2x = sapply(g2x, paste, " nCi/100uL")
+g3x = sapply(g3x, paste, " mg/mL")
+
+
+pal = c("#1289d7", "#00008b", "#B20000", "#ffa500","#4C0CFC", "#0ACC1A", "#FF00A1", "#7F2A06")
 
 
 
-
-
-
-
-
-mAverage225tras = melt(Average225tras, id="Days")
-colnames(mAverage225tras) = c("times", "Organs", "values")
-
-plot225tras = ggplot()+ 
-  geom_line(data=mAverage225tras, aes(x=times, y=values, color=Organs), size=1, alpha=1)+
-  geom_ribbon(data=mAverage225errortras, aes(x=times, ymin=valuesminus,  ymax=valuesplus, fill = Organs), alpha = 0.1)+
-  ggtitle("DOTA-Trastuzumab")+
+plot1 = plot_ly() %>%
+  add_trace(x = timesOut, y = gAve[1,1,], name = g1x[1], type = "scatter", mode = 'lines+markers', marker = list(color=pal[1]), line = list(color=pal[1])) %>%#, error_y = ~list(array = gErr[1,1,], color = pal[1])) %>%
+  add_trace(x = timesOut, y = gAve[2,1,], name = g1x[2], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[2]), line = list(color=pal[2])) %>%#, error_y = ~list(array = gErr[2,1,], color = pal[2])) %>%
+  add_trace(x = timesOut, y = gAve[3,1,], name = g1x[3], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[3]), line = list(color=pal[3])) %>%#, error_y = ~list(array = gErr[3,1,], color = pal[3])) %>%
+  add_trace(x = timesOut, y = gAve[4,1,], name = g1x[4], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[4]), line = list(color=pal[4])) %>%#, error_y = ~list(array = gErr[4,1,], color = pal[4])) %>%
+  add_trace(x = timesOut, y = gAve[5,1,], name = g1x[5], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[5]), line = list(color=pal[5])) %>%#, error_y = ~list(array = gErr[5,1,], color = pal[5])) %>%
+  add_trace(x = timesOut, y = gAve[6,1,], name = g1x[6], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[6]), line = list(color=pal[6])) %>%#, error_y = ~list(array = gErr[6,1,], color = pal[6])) %>%
+  add_trace(x = timesOut, y = gAve[7,1,], name = g1x[7], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[7]), line = list(color=pal[7])) %>%#, error_y = ~list(array = gErr[7,1,], color = pal[7])) %>%
+  add_trace(x = timesOut, y = gAve[8,1,], name = g1x[8], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[8]), line = list(color=pal[8])) %>%#, error_y = ~list(array = gErr[8,1,], color = pal[8])) %>%
+  layout(title = "DOTA-Ac-225",
+         xaxis = list(title = "Time (hr)", showgrid = FALSE, range = c(0, 46)),
+         yaxis = list(title = "Normalized Growth", showgrid = FALSE, range = c(0, 1)),
+         font = list(size = 12))
   
-  #scale_shape_manual(values = c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17))+ 
+plot1
+
+
+
+plot2 = plot_ly() %>%
+  add_trace(x = timesOut, y = gAve[1,2,], name = g2x[1], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[1]), line = list(color=pal[1])) %>%
+  add_trace(x = timesOut, y = gAve[2,2,], name = g2x[2], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[2]), line = list(color=pal[2])) %>%
+  add_trace(x = timesOut, y = gAve[3,2,], name = g2x[3], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[3]), line = list(color=pal[3])) %>%
+  add_trace(x = timesOut, y = gAve[4,2,], name = g2x[4], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[4]), line = list(color=pal[4])) %>%
+  add_trace(x = timesOut, y = gAve[5,2,], name = g2x[5], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[5]), line = list(color=pal[5])) %>%
+  add_trace(x = timesOut, y = gAve[6,2,], name = g2x[6], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[6]), line = list(color=pal[6])) %>%
+  add_trace(x = timesOut, y = gAve[7,2,], name = g2x[7], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[7]), line = list(color=pal[7])) %>%
+  add_trace(x = timesOut, y = gAve[8,2,], name = g2x[8], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[8]), line = list(color=pal[8])) %>%
+  layout(title = "IgG(#2)-DOTA-Ac-225",
+         xaxis = list(title = "Time (hr)", showgrid = FALSE, range = c(0, 46)),
+         yaxis = list(title = "Normalized Growth", showgrid = FALSE, range = c(0, 1)),
+         font = list(size = 12),
+         showlegend = TRUE)
+
+plot2  
   
-  scale_x_log10()+#breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000))+
-  annotation_logticks(base = 10, sides = "b", scaled = TRUE,
-                      short = unit(0.1, "cm"), mid = unit(0.2, "cm"), long = unit(0.3, "cm"),
-                      colour = "black", size = 0.5, linetype = 1, alpha = 1, color = NULL)+
-  
-  scale_y_continuous()+#limits = c(min(plot225scale),max(plot225scale)), breaks=plot225scale)+#breaks=c(lseq(0.000001,100,9)))+
-  theme_bw() +
-  theme(legend.position="none", plot.margin = unit(margins, "cm"))+
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
-  labs(y=element_blank(), x=element_blank(), color="Organs")+
-  theme(text = element_text(size=18, face = "bold"),
-        axis.text.y=element_text(colour="black"),
-        axis.text.x=element_text(colour="black"),
-        plot.title = element_text(hjust = 0.5, size=18))
-#+
-#guides(shape=guide_legend(override.aes = list(size=3)))
+plot3 = plot_ly() %>%
+  add_trace(x = timesOut, y = gAve[1,3,], name = g3x[1], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[1]), line = list(color=pal[1])) %>%
+  add_trace(x = timesOut, y = gAve[2,3,], name = g3x[2], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[2]), line = list(color=pal[2])) %>%
+  add_trace(x = timesOut, y = gAve[3,3,], name = g3x[3], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[3]), line = list(color=pal[3])) %>%
+  add_trace(x = timesOut, y = gAve[4,3,], name = g3x[4], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[4]), line = list(color=pal[4])) %>%
+  add_trace(x = timesOut, y = gAve[5,3,], name = g3x[5], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[5]), line = list(color=pal[5])) %>%
+  add_trace(x = timesOut, y = gAve[6,3,], name = g3x[6], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[6]), line = list(color=pal[6])) %>%
+  add_trace(x = timesOut, y = gAve[7,3,], name = g3x[7], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[7]), line = list(color=pal[7])) %>%
+  add_trace(x = timesOut, y = gAve[8,3,], name = g3x[8], type = 'scatter', mode = 'lines+markers', marker = list(color=pal[8]), line = list(color=pal[8])) %>%
+  layout(title = "IgG(#2)",
+         xaxis = list(title = "Time (hr)", showgrid = FALSE, range = c(0, 46)),
+         yaxis = list(title = "Normalized Growth", showgrid = FALSE, range = c(0, 1)),
+         font = list(size = 12))
+
+plot3
+
+#subplot(plot1, plot2, plot3)
+
+
+
